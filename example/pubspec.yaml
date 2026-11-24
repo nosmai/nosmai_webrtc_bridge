@@ -1,0 +1,25 @@
+name: nosmai_webrtc_bridge_example
+description: Publish and receive a filtered camera stream over WebRTC.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_webrtc: 1.6.0
+  nosmai_effects_sdk: 2.0.2
+  nosmai_webrtc_bridge:
+    path: ../
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

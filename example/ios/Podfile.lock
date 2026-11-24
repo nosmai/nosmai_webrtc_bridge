@@ -1,0 +1,60 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutter_webrtc (1.6.0):
+    - Flutter
+    - WebRTC-SDK (= 144.7559.09)
+  - nosmai_effects_sdk (2.0.2):
+    - Flutter
+    - NosmaiCameraSDK (= 3.0.7)
+  - nosmai_webrtc_bridge (0.1.0):
+    - Flutter
+    - flutter_webrtc
+    - NosmaiCameraSDK
+  - NosmaiCameraSDK (3.0.7)
+  - permission_handler_apple (9.4.8):
+    - Flutter
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+  - WebRTC-SDK (144.7559.09)
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
+  - nosmai_effects_sdk (from `.symlinks/plugins/nosmai_effects_sdk/ios`)
+  - nosmai_webrtc_bridge (from `.symlinks/plugins/nosmai_webrtc_bridge/ios`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - NosmaiCameraSDK
+    - WebRTC-SDK
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutter_webrtc:
+    :path: ".symlinks/plugins/flutter_webrtc/ios"
+  nosmai_effects_sdk:
+    :path: ".symlinks/plugins/nosmai_effects_sdk/ios"
+  nosmai_webrtc_bridge:
+    :path: ".symlinks/plugins/nosmai_webrtc_bridge/ios"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
+  shared_preferences_foundation:
+    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_webrtc: f952258e6fa67477d481cfbad2885a4f117922a7
+  nosmai_effects_sdk: 46cf5b65d29a19d72b48d47a777bb52d7d8f9be8
+  nosmai_webrtc_bridge: fd54dc504040e8f0d4934ebf157f6ed5fec5e02e
+  NosmaiCameraSDK: b914cb19ea0f88faf537e726f0b09bfa20ba3bc7
+  permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  WebRTC-SDK: e6006119cd730d6315d875e4a421b6cc8bb88833
+
+PODFILE CHECKSUM: 1f61a5a64679deeb8c83133f73b8c609834562cf
+
+COCOAPODS: 1.16.2

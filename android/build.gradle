@@ -1,0 +1,67 @@
+group = "com.nosmai.webrtc_bridge"
+version = "0.1.0"
+
+buildscript {
+    ext.kotlin_version = "2.1.0"
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+android {
+    namespace = "com.nosmai.webrtc_bridge"
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = JavaVersion.VERSION_17.toString() }
+    sourceSets { main.java.srcDirs += "src/main/kotlin" }
+    defaultConfig {
+        minSdk = 24
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    dependencies {
+        // org.webrtc.* — flutter_webrtc bundles the same build at runtime, so compileOnly.
+        compileOnly("io.github.webrtc-sdk:android:144.7559.09")
+        // com.cloudwebrtc.webrtc.* (FlutterWebRTCPlugin, LocalVideoTrack) — provided by flutter_webrtc.
+        compileOnly(project(":flutter_webrtc"))
+
+        // Compile against the native SDK the host already packages.
+        def effects = rootProject.findProject(":nosmai_effects_sdk")
+        if (effects != null) {
+            evaluationDependsOn(effects.path)
+            def sdk = effects.configurations.implementation.dependencies.find {
+                it.group == "com.nosmai" && it.name == "nosmai-sdk"
+            }
+            if (sdk == null) throw new GradleException("Cannot locate the Nosmai Android SDK dependency in nosmai_effects_sdk.")
+            compileOnly(sdk.copy())
+        } else {
+            // Existing nosmai_camera_sdk apps supply their native SDK in app/libs.
+            def libs = fileTree(dir: "${rootProject.projectDir}/app/libs", include: "nosmai*.aar").files
+            if (libs.size() != 1) throw new GradleException("Expected one Nosmai AAR under android/app/libs for nosmai_camera_sdk.")
+            compileOnly(name: libs.first().name - ".aar", ext: "aar")
+        }
+    }
+}
+
+repositories {
+    flatDir { dirs "${rootProject.projectDir}/app/libs" }
+}

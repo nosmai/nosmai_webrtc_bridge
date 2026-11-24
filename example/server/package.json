@@ -1,0 +1,9 @@
+{
+  "name": "webrtc-qa-signalling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local signalling server + browser viewer for the Nosmai WebRTC QA app (test fixture, not production)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" }
+}

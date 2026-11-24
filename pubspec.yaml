@@ -1,0 +1,30 @@
+name: nosmai_webrtc_bridge
+description: "Publish a Nosmai-processed camera feed over raw WebRTC (flutter_webrtc) from Flutter on Android and iOS, with frame counters and stream mirror control."
+version: 0.1.0
+publish_to: 'none'
+repository: https://github.com/nosmai/nosmai_webrtc_bridge
+
+environment:
+  sdk: ^3.5.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Pinned: the bridge wraps a natively-minted track with MediaStreamTrackNative, which is an
+  # implementation import (see lib/nosmai_webrtc_bridge.dart). Re-verify when upgrading.
+  flutter_webrtc: 1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.nosmai.webrtc_bridge
+        pluginClass: NosmaiWebRtcBridgePlugin
+      ios:
+        pluginClass: NosmaiWebRtcBridgePlugin

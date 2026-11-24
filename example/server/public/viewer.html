@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nosmai WebRTC QA Viewer</title>
+<style>
+  :root { color-scheme: light dark; font-family: -apple-system, system-ui, sans-serif; }
+  body { margin: 0; padding: 16px; display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 800px) { body { grid-template-columns: 1fr; } }
+  video { width: 100%; background: #000; border-radius: 8px; aspect-ratio: 9/16; max-height: 80vh; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td { padding: 4px 8px; border-bottom: 1px solid #8884; }
+  td:first-child { color: #888; width: 45%; }
+  td:last-child { font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
+  button { padding: 8px 14px; font-size: 14px; margin-right: 6px; }
+  #status { margin: 8px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<div>
+  <h1>Nosmai WebRTC QA Viewer</h1>
+  <div>
+    <input id="room" value="qa" size="8">
+    <button id="connect">Connect</button>
+    <button id="unmute">Unmute</button>
+    <button id="csv">Download viewer CSV</button>
+  </div>
+  <div id="status">Not connected.</div>
+  <video id="v" autoplay playsinline muted></video>
+</div>
+<div>
+  <h1>Receiver stats (decoded side)</h1>
+  <table id="stats"></table>
+  <p style="font-size:12px;color:#888">Orientation check: the picture must be upright and not mirrored incorrectly. Effects must be visible. "Decoded fps" is what the viewer actually decodes, independent of the phone's sent fps.</p>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+$('room').value = params.get('room') || 'qa';
+let ws, pc, timer, prev = null, rows = [], t0 = 0, firstFrameMs = null, connectedAt = 0;
+
+function setStatus(t) { $('status').textContent = t; console.log(t); }
+
+$('unmute').onclick = () => { $('v').muted = false; $('v').play(); };
+
+if (params.get('auto') === '1') setTimeout(connect, 300); // no mic prompt: for scripted runs
+
+$('connect').onclick = async () => {
+  // Chrome hides LAN IPs behind mDNS names unless a capture permission was granted; the phone
+  // cannot resolve those. A one-off mic grant exposes real host candidates for direct LAN media.
+  try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); }
+  catch (e) { setStatus('Mic permission not granted: ICE may fail on LAN (' + e.name + ')'); }
+  connect();
+};
+
+function connect() {
+  if (ws) ws.close();
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen = () => { ws.send(JSON.stringify({ type: 'join', room: $('room').value, role: 'viewer' })); setStatus('Waiting for phone to go live...'); };
+  ws.onclose = () => setStatus('Signalling closed');
+  ws.onmessage = async (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'offer') await onOffer(m);
+    else if (m.type === 'candidate' && pc) pc.addIceCandidate({ candidate: m.candidate, sdpMid: m.sdpMid, sdpMLineIndex: m.sdpMLineIndex }).catch(console.warn);
+    else if (m.type === 'publisher-left') setStatus('Publisher left');
+  };
+}
+
+async function onOffer(m) {
+  if (pc) pc.close();
+  clearInterval(timer); prev = null; rows = []; firstFrameMs = null;
+  pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  t0 = performance.now();
+  pc.ontrack = (ev) => {
+    if (ev.track.kind === 'video') {
+      $('v').srcObject = ev.streams[0] || new MediaStream([ev.track]);
+      $('v').requestVideoFrameCallback?.(() => { firstFrameMs = Math.round(performance.now() - t0); });
+    } else if (!$('v').srcObject) $('v').srcObject = ev.streams[0];
+  };
+  pc.onicecandidate = (ev) => { if (ev.candidate) ws.send(JSON.stringify({ type: 'candidate', candidate: ev.candidate.candidate, sdpMid: ev.candidate.sdpMid, sdpMLineIndex: ev.candidate.sdpMLineIndex })); };
+  pc.oniceconnectionstatechange = () => setStatus('ICE: ' + pc.iceConnectionState);
+  await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+  const ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  ws.send(JSON.stringify({ type: 'answer', sdp: ans.sdp }));
+  timer = setInterval(poll, 1000);
+}
+
+const f = (v, d = 1) => v == null || Number.isNaN(v) ? '' : Number(v).toFixed(d);
+
+async function poll() {
+  if (!pc) return;
+  const rep = await pc.getStats();
+  let inb, codec, pair;
+  rep.forEach(s => {
+    if (s.type === 'inbound-rtp' && s.kind === 'video') inb = s;
+    if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated) pair = s;
+  });
+  if (!inb) return;
+  rep.forEach(s => { if (s.type === 'codec' && s.id === inb.codecId) codec = s; });
+  const now = performance.now();
+  const d = prev ? (now - prev.t) / 1000 : null;
+  const decFps = d ? (inb.framesDecoded - prev.framesDecoded) / d : inb.framesPerSecond;
+  const kbps = d ? (inb.bytesReceived - prev.bytes) * 8 / d / 1000 : null;
+  const jbMs = inb.jitterBufferEmittedCount ? inb.jitterBufferDelay / inb.jitterBufferEmittedCount * 1000 : null;
+  const v = $('v');
+  const row = {
+    time_s: ((now - t0) / 1000).toFixed(0), video_width: inb.frameWidth ?? v.videoWidth, video_height: inb.frameHeight ?? v.videoHeight,
+    decoded_fps: f(decFps), received_kbps: f(kbps, 0), codec: codec?.mimeType || '', decoder: inb.decoderImplementation || '',
+    jitter_ms: f(inb.jitter * 1000), packets_lost: inb.packetsLost, nack: inb.nackCount, pli: inb.pliCount,
+    freeze_count: inb.freezeCount ?? '', freeze_s: f(inb.totalFreezesDuration, 2), frames_dropped: inb.framesDropped ?? '',
+    jitter_buffer_ms: f(jbMs), rtt_ms: pair ? f(pair.currentRoundTripTime * 1000, 0) : '', first_frame_ms: firstFrameMs ?? '',
+  };
+  rows.push(row);
+  ws.send(JSON.stringify({ type: 'viewer-stats', decodedFps: +row.decoded_fps || 0, renderedFps: +row.decoded_fps || 0, w: row.video_width || 0, h: row.video_height || 0, kbps: +row.received_kbps || 0, jitterMs: +row.jitter_ms || 0, freezes: +row.freeze_count || 0 }));
+  prev = { t: now, framesDecoded: inb.framesDecoded, bytes: inb.bytesReceived };
+  $('stats').innerHTML = Object.entries({
+    'Decoded resolution': `${row.video_width}x${row.video_height}`, 'Decoded fps': row.decoded_fps, 'Receive bitrate': row.received_kbps + ' kbps',
+    'Codec': row.codec, 'Decoder': row.decoder, 'Jitter': row.jitter_ms + ' ms', 'Jitter buffer delay': row.jitter_buffer_ms + ' ms',
+    'Packets lost': row.packets_lost, 'NACK / PLI': `${row.nack} / ${row.pli}`, 'Freezes (count / s)': `${row.freeze_count} / ${row.freeze_s}`,
+    'Frames dropped': row.frames_dropped, 'RTT': row.rtt_ms + ' ms', 'Time to first frame (after offer)': row.first_frame_ms + ' ms',
+  }).map(([k, val]) => `<tr><td>${k}</td><td>${val}</td></tr>`).join('');
+}
+
+$('csv').onclick = () => {
+  if (!rows.length) return;
+  const head = Object.keys(rows[0]).join(',');
+  const body = rows.map(r => Object.values(r).map(x => `"${String(x).replaceAll('"', '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([head + '\n' + body], { type: 'text/csv' }));
+  a.download = `viewer_stats_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.click();
+};
+</script>
+</body>
+</html>
